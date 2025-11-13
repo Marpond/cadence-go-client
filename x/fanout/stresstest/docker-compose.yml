@@ -1,0 +1,84 @@
+services:
+  cassandra:
+    image: cassandra:4.1.1
+    ports:
+      - "9042:9042"
+    environment:
+      - "MAX_HEAP_SIZE=512M"
+      - "HEAP_NEWSIZE=256M"
+    healthcheck:
+      test: ["CMD", "cqlsh", "-u cassandra", "-p cassandra", "-e describe keyspaces"]
+      interval: 15s
+      timeout: 30s
+      retries: 10
+    networks:
+      - fanout-stress-network
+
+  prometheus:
+    image: prom/prometheus:latest
+    volumes:
+      - ./prometheus:/etc/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+    ports:
+      - '9090:9090'
+    networks:
+      - fanout-stress-network
+
+  cadence:
+    image: ubercadence/server:master-auto-setup
+    ports:
+      - "8000:8000"
+      - "8001:8001"
+      - "8002:8002"
+      - "8003:8003"
+      - "7933:7933"
+      - "7934:7934"
+      - "7935:7935"
+      - "7939:7939"
+      - "7833:7833"
+    environment:
+      - "CASSANDRA_SEEDS=cassandra"
+      # More shards = more Cassandra partitions = better parallelism
+      # Production uses 1024, we use 256 for local testing
+      # Key insight: shardID = hash(workflowID) % NUM_HISTORY_SHARDS
+      - "NUM_HISTORY_SHARDS=256"
+      - "PROMETHEUS_ENDPOINT_0=0.0.0.0:8000"
+      - "PROMETHEUS_ENDPOINT_1=0.0.0.0:8001"
+      - "PROMETHEUS_ENDPOINT_2=0.0.0.0:8002"
+      - "PROMETHEUS_ENDPOINT_3=0.0.0.0:8003"
+      - "DYNAMIC_CONFIG_FILE_PATH=config/dynamicconfig/development.yaml"
+      - "LOG_LEVEL=info"
+    depends_on:
+      cassandra:
+        condition: service_healthy
+    networks:
+      - fanout-stress-network
+
+  cadence-web:
+    image: ubercadence/web:latest
+    environment:
+      - "CADENCE_GRPC_PEERS=cadence:7833"
+    ports:
+      - "8088:8088"
+    depends_on:
+      - cadence
+    networks:
+      - fanout-stress-network
+
+  grafana:
+    image: grafana/grafana
+    volumes:
+      - ./grafana:/etc/grafana
+    depends_on:
+      - prometheus
+    ports:
+      - '3000:3000'
+    networks:
+      - fanout-stress-network
+
+networks:
+  fanout-stress-network:
+    name: fanout-stress-network
+    driver: bridge
+

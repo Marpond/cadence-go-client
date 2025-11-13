@@ -1,0 +1,29 @@
+global:
+  scrape_interval: 5s
+  evaluation_interval: 5s
+
+scrape_configs:
+  - job_name: 'cadence-frontend'
+    static_configs:
+      - targets: ['cadence:8000']
+        labels:
+          service: 'frontend'
+
+  - job_name: 'cadence-history'
+    static_configs:
+      - targets: ['cadence:8001']
+        labels:
+          service: 'history'
+
+  - job_name: 'cadence-matching'
+    static_configs:
+      - targets: ['cadence:8002']
+        labels:
+          service: 'matching'
+
+  - job_name: 'cadence-worker'
+    static_configs:
+      - targets: ['cadence:8003']
+        labels:
+          service: 'worker'
+
